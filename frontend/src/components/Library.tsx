@@ -7,6 +7,7 @@ import { fmtDate, fmtDuration } from '@/lib/format';
 import { srcSet } from '@/lib/media';
 import Icon from './Icon';
 import Lightbox from './Lightbox';
+import { videoSrc } from '@/lib/endpoint';
 
 type T = Dict['libraryPage'];
 
@@ -157,7 +158,7 @@ export default function Library({ videos, albums, t, lang }: { videos: VideoItem
           <video
             key={videos[video].id}
             className="lb__video"
-            src={videos[video].url}
+            src={videoSrc(videos[video].url)}
             poster={videos[video].poster || undefined}
             controls
             autoPlay

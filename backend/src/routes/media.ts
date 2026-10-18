@@ -46,6 +46,12 @@ export async function mediaHandler(req: Request, res: Response) {
     // Ảnh thư viện có mã ngẫu nhiên trong tên → cache vĩnh viễn. Video/ảnh bìa có tên cố định (có thể bị thay) → cache 1 ngày + kiểm tra ETag.
     res.setHeader('Cache-Control', key.startsWith('media/videos/') ? 'public, max-age=86400, must-revalidate' : 'public, max-age=31536000, immutable');
     res.setHeader('Accept-Ranges', 'bytes');
+    // CDN phía trước (Vercel rewrite, Cloudflare…) không phân biệt Range khi cache → có thể lưu 1 mảnh 206 rồi trả cho mọi request.
+    // Video và mọi response theo Range: chỉ cho trình duyệt cache, không cho CDN cache.
+    if (range || key.startsWith('media/videos/')) {
+      res.setHeader('CDN-Cache-Control', 'no-store');
+      res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+    }
     if (obj.etag) res.setHeader('ETag', obj.etag);
     if (range && obj.range && obj.totalSize !== undefined) {
       res.status(206);

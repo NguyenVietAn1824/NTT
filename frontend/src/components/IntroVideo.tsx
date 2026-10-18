@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import type { VideoItem } from '@/lib/api';
 import { fmtDuration } from '@/lib/format';
 import Icon from './Icon';
+import { videoSrc } from '@/lib/endpoint';
 
 // Video giới thiệu: hiện ảnh bìa + nút phát; chỉ tải video khi người xem bấm (trang chủ không phải tải ~47MB)
 export default function IntroVideo({ video, t }: { video: VideoItem; t: { play: string; label: string } }) {
@@ -17,7 +18,7 @@ export default function IntroVideo({ video, t }: { video: VideoItem; t: { play: 
         {playing ? (
           <video
             ref={ref}
-            src={introVideo.url}
+            src={videoSrc(introVideo.url)}
             poster={introVideo.poster || undefined}
             controls
             autoPlay
