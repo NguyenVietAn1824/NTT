@@ -1,0 +1,18 @@
+# Caddy: nhận HTTP/HTTPS từ ngoài vào và chuyển cho website (Next.js).
+# SITE_DOMAIN là tên miền (VD "nttvietnam.vn, www.nttvietnam.vn") → Caddy tự xin & gia hạn HTTPS (Let's Encrypt).
+# SITE_DOMAIN=":80" → chạy HTTP thường bằng IP (để thử trước khi có tên miền).
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	# Upload video tới 600MB
+	request_body {
+		max_size 700MB
+	}
+
+	reverse_proxy web:3000 {
+		transport http {
+			read_timeout 15m
+			write_timeout 15m
+		}
+	}
+}

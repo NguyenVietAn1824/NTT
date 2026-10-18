@@ -1,0 +1,188 @@
+// Database schema — NTT Logistics
+// Dev: SQLite (file). Production: đổi provider thành "postgresql" và DATABASE_URL tương ứng.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Tài khoản quản trị
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("ADMIN") // ADMIN | EDITOR
+  createdAt    DateTime @default(now())
+  media        Media[]
+  videos       Video[]
+}
+
+// Thư viện ảnh. File thật nằm trong storage (S3/R2/MinIO hoặc ổ đĩa), ở đây lưu thông tin + các kích cỡ.
+model Media {
+  id           Int      @id @default(autoincrement())
+  key          String   @unique // key của bản lớn nhất, VD media/2026/10/ab12-xe-tai-1600.webp
+  filename     String // tên file gốc
+  alt          String   @default("") // mô tả ảnh (SEO, người khiếm thị)
+  mime         String
+  width        Int
+  height       Int
+  size         Int // tổng dung lượng các bản đã lưu (byte)
+  originalSize Int // dung lượng file gốc upload
+  variants     String // JSON [{ w, h, key, size }]
+  uploadedById Int?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  albumPhotos  AlbumPhoto[]
+
+  @@index([createdAt])
+}
+
+// Video công ty (thư viện). File mp4 + ảnh bìa nằm trong storage dưới media/videos/
+model Video {
+  id           Int      @id @default(autoincrement())
+  slug         String   @unique
+  key          String   @unique // media/videos/<id>-<slug>.mp4
+  posterKey    String? // media/videos/<id>-<slug>-poster.webp
+  titleVi      String
+  titleEn      String   @default("")
+  titleJa      String   @default("")
+  descVi       String   @default("")
+  descEn       String   @default("")
+  descJa       String   @default("")
+  duration     Float    @default(0) // giây
+  width        Int      @default(0)
+  height       Int      @default(0)
+  size         Int      @default(0) // byte
+  featured     Boolean  @default(false) // hiện ở trang chủ
+  published    Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  recordedAt   DateTime?
+  uploadedById Int?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([published, sortOrder])
+}
+
+// Album ảnh (thư viện) — ảnh lấy từ bảng Media
+model Album {
+  id        Int          @id @default(autoincrement())
+  slug      String       @unique
+  titleVi   String
+  titleEn   String       @default("")
+  titleJa   String       @default("")
+  date      DateTime?
+  published Boolean      @default(true)
+  sortOrder Int          @default(0)
+  photos    AlbumPhoto[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model AlbumPhoto {
+  id        Int   @id @default(autoincrement())
+  albumId   Int
+  mediaId   Int
+  sortOrder Int   @default(0)
+  album     Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  media     Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, mediaId])
+  @@index([albumId, sortOrder])
+}
+
+// Yêu cầu báo giá từ website
+model Quote {
+  id        Int      @id @default(autoincrement())
+  name      String
+  company   String?
+  phone     String
+  email     String?
+  service   String?
+  route     String?
+  message   String?
+  lang      String   @default("vi")
+  status    String   @default("NEW") // NEW | CONTACTED | QUOTED | WON | LOST
+  note      String? // ghi chú nội bộ
+  ip        String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+// Tin tức (đa ngôn ngữ)
+model News {
+  id           Int               @id @default(autoincrement())
+  slug         String            @unique
+  coverImage   String?
+  gallery      String            @default("[]") // JSON array đường dẫn ảnh
+  published    Boolean           @default(true)
+  publishedAt  DateTime          @default(now())
+  translations NewsTranslation[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([published, publishedAt])
+}
+
+model NewsTranslation {
+  id      Int    @id @default(autoincrement())
+  newsId  Int
+  lang    String // vi | en | ja
+  title   String
+  excerpt String
+  body    String // Markdown
+  news    News   @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, lang])
+}
+
+// Tuyển dụng (đa ngôn ngữ)
+model Job {
+  id           Int              @id @default(autoincrement())
+  icon         String           @default("truck")
+  openings     Int              @default(1)
+  active       Boolean          @default(true)
+  sortOrder    Int              @default(0)
+  translations JobTranslation[]
+  applications Application[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model JobTranslation {
+  id          Int     @id @default(autoincrement())
+  jobId       Int
+  lang        String
+  title       String
+  location    String
+  description String?
+  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, lang])
+}
+
+// Hồ sơ ứng tuyển
+model Application {
+  id        Int      @id @default(autoincrement())
+  jobId     Int?
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  name      String
+  phone     String
+  email     String?
+  message   String?
+  cvFile    String? // key trong storage, dạng cv/<file> (riêng tư)
+  cvName    String? // tên file gốc
+  status    String   @default("NEW") // NEW | REVIEWING | INTERVIEW | HIRED | REJECTED
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+}

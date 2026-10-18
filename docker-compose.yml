@@ -1,0 +1,96 @@
+# Chạy toàn bộ website NTT Logistics trên một máy có Docker:
+#   cp .env.production.example .env   # rồi sửa các giá trị trong .env
+#   docker compose up -d --build
+# Hướng dẫn chi tiết: DEPLOY.md
+services:
+  # Cổng vào duy nhất: HTTP 80 / HTTPS 443, tự cấp chứng chỉ SSL
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+      - '${HTTPS_PORT:-443}:443/udp'
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN in .env}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
+        BACKEND_URL: http://api:4000
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      BACKEND_URL: http://api:4000
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://ntt:${DB_PASSWORD}@db:5432/ntt?schema=public
+      CORS_ORIGIN: ${SITE_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nttvietnam.vn}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      NOTIFY_EMAIL: ${NOTIFY_EMAIL:-}
+      STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: ntt-media
+      S3_ACCESS_KEY_ID: ntt
+      S3_SECRET_ACCESS_KEY: ${MINIO_PASSWORD:?Set MINIO_PASSWORD in .env}
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_AUTO_CREATE_BUCKET: 'true'
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ntt
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ntt
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ntt']
+      interval: 5s
+      retries: 20
+
+  # Kho ảnh / video / CV (tương thích S3). Image MinIO chính thức đã ngừng phát hành
+  # → dùng bản Chainguard build từ mã nguồn (amd64 + arm64), ghim digest.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56
+    command: server /data --console-address :9001
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ntt
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?Set MINIO_PASSWORD in .env}
+    volumes:
+      - minio-data:/data
+
+volumes:
+  pgdata:
+  minio-data:
+  caddy-data:
+  caddy-config:

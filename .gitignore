@@ -1,0 +1,21 @@
+# phụ thuộc & bản build
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+
+# bí mật — KHÔNG đưa lên Git
+.env
+.env.*
+!.env.production.example
+!.env.example
+
+# dữ liệu chạy thử
+*.db
+*.db-journal
+backend/storage/
+backups/
+
+# file media lớn để ở thư mục gốc (video gốc, ảnh gốc)
+/*.mp4
+/*.jpg
