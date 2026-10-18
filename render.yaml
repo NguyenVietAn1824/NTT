@@ -20,7 +20,7 @@ services:
       - key: S3_REGION
         value: auto
       - key: S3_BUCKET
-        value: ntt-media
+        value: ntt
       - key: S3_FORCE_PATH_STYLE
         value: 'true'
       - key: IMPORT_OLD_LIBRARY

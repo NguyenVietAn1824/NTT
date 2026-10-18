@@ -19,3 +19,4 @@ backups/
 # file media lớn để ở thư mục gốc (video gốc, ảnh gốc)
 /*.mp4
 /*.jpg
+.neon

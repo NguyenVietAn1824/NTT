@@ -41,29 +41,27 @@ Làm lần lượt từ bước 1 đến bước 8, mỗi bước ghi lại các
    ```
    Khi hỏi mật khẩu: GitHub không nhận mật khẩu đăng nhập, phải dùng **Personal access token** (GitHub → Settings → Developer settings → Personal access tokens → Generate, tích quyền `repo`) hoặc cài [GitHub CLI](https://cli.github.com) rồi chạy `gh auth login`.
 
-## Bước 2 — Database: Neon
+## Bước 2 — Database: Neon ✅ (đã làm)
 
-1. Vào <https://neon.tech> → **Sign up** bằng GitHub.
-2. Tạo project: tên `ntt`, Postgres **16**, Region **AWS Asia Pacific (Singapore)** → **Create**.
-3. Ở Dashboard bấm **Connect** → **tắt** ô *Connection pooling* → copy chuỗi kết nối, dạng:
-   ```
-   postgresql://neondb_owner:xxxx@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-   ```
-   → ghi lại là **DATABASE_URL**.
+Project Neon `rough-recipe-67479814`, nhánh `production`, đã được liên kết bằng Neon CLI (`neon init` + `neon deploy`) và đã kiểm tra: tạo đủ 11 bảng, ghi/đọc/xóa thử thành công.
+
+Chuỗi kết nối nằm trong file **`.env.local`** ở thư mục gốc dự án (file này không lên Git). Lấy dòng **`DATABASE_URL_UNPOOLED`** → ghi lại là **DATABASE_URL** cho bước 5.
+
+> Dùng bản *UNPOOLED* (kết nối trực tiếp) vì khi khởi động API chạy `prisma db push` — lệnh này không chạy qua pooler. Lấy lại chuỗi khi cần: `npx neon@latest env pull`, hoặc Neon Console → **Connect** → tắt *Connection pooling*.
 
 ## Bước 3 — Kho ảnh/video: Cloudflare R2
 
 1. Vào <https://dash.cloudflare.com/sign-up> → tạo tài khoản (không cần tên miền).
 2. Menu trái **R2 Object Storage** → **Purchase R2 Plan / Add payment** → nhập thẻ (gói free, không bị trừ tiền nếu dưới 10GB).
-3. **Create bucket** → tên `ntt-media` → Location: **Asia-Pacific (APAC)** → **Create**. Không bật Public access (ảnh đi qua API).
+3. **Create bucket** → tên `ntt` → Location: **Asia-Pacific (APAC)** → **Create**. Không bật Public access (ảnh đi qua API).
 4. Quay lại trang R2 → **Manage R2 API Tokens** (hoặc *API → Manage API tokens*) → **Create API token**:
    - Permissions: **Object Read & Write**
-   - Specify bucket: **Apply to specific buckets only** → `ntt-media`
+   - Specify bucket: **Apply to specific buckets only** → `ntt`
    - **Create API Token**
 5. Trang kết quả hiện **một lần duy nhất** — ghi lại:
    - *Access Key ID* → **S3_ACCESS_KEY_ID**
    - *Secret Access Key* → **S3_SECRET_ACCESS_KEY**
-   - *Endpoint* dạng `https://<account-id>.r2.cloudflarestorage.com` → **S3_ENDPOINT** (bỏ phần `/ntt-media` ở cuối nếu có)
+   - *Endpoint* dạng `https://<account-id>.r2.cloudflarestorage.com` → **S3_ENDPOINT** (bỏ phần `/ntt` ở cuối) — của NTT: `https://181d0f93d4df8cb9abedfc2ec715d05c.r2.cloudflarestorage.com`
 
 > Không muốn dùng Cloudflare? Thay bằng **Backblaze B2** (free 10GB, không cần thẻ): tạo bucket Private, tạo *Application Key* quyền Read & Write cho bucket đó; `S3_ENDPOINT=https://s3.<region>.backblazeb2.com` (xem ở trang bucket), và ở bước 4 đổi `S3_REGION` thành `<region>` (VD `us-west-004`). Lưu ý B2 free giới hạn ~1GB lượt tải mỗi ngày — video nhiều người xem có thể chạm mức này.
 
@@ -78,7 +76,7 @@ Làm lần lượt từ bước 1 đến bước 8, mỗi bước ghi lại các
 
    | Biến | Giá trị |
    |---|---|
-   | `DATABASE_URL` | chuỗi Neon ở bước 2 |
+   | `DATABASE_URL` | giá trị `DATABASE_URL_UNPOOLED` trong `.env.local` (bước 2) |
    | `CORS_ORIGIN` | **SITE** ở bước 4, VD `https://ntt-logistics.vercel.app` (không có `/` cuối) |
    | `S3_ENDPOINT` | ở bước 3 |
    | `S3_ACCESS_KEY_ID` | ở bước 3 |
@@ -155,7 +153,7 @@ Sửa code trên máy → `git add . && git commit -m "mô tả" && git push`. V
 | Hiện tượng | Cách xử lý |
 |---|---|
 | Render build lỗi / API không Live | Tab **Logs**: thường do nhập sai `DATABASE_URL` hoặc khóa R2. Sửa trong Environment → Save (tự deploy lại) |
-| Log báo `[storage] chưa sẵn sàng` lặp lại | Sai `S3_ENDPOINT` / khóa R2, hoặc token chưa được cấp quyền cho bucket `ntt-media` |
+| Log báo `[storage] chưa sẵn sàng` lặp lại | Sai `S3_ENDPOINT` / khóa R2, hoặc token chưa được cấp quyền cho bucket `ntt` |
 | Gửi form / tải ảnh báo lỗi, Console trình duyệt có chữ **CORS** | `CORS_ORIGIN` trên Render phải trùng **chính xác** địa chỉ web (có `https://`, không có `/` cuối) |
 | Trang chủ không có tin tức / video | API đang ngủ hoặc lỗi → mở `API/api/health`; kiểm tra lịch cron-job.org còn chạy. Nội dung tự hiện lại sau tối đa 1 phút |
 | Đăng nhập admin xong bị đẩy ra | Mở web bằng đúng địa chỉ `https://…vercel.app` (không mở thẳng địa chỉ Render) |
