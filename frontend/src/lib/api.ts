@@ -1,7 +1,11 @@
 // Gọi backend từ Server Components (SSR). Dữ liệu được cache và làm mới mỗi 60 giây.
 import type { Lang } from '@/content';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+const BACKEND_URL = (() => {
+  const v = (process.env.BACKEND_URL || '').trim().replace(/\/+$/, '');
+  if (!v) return 'http://localhost:4000';
+  return /^https?:\/\//.test(v) ? v : `https://${v}`;
+})();
 
 export interface NewsSummary {
   slug: string;

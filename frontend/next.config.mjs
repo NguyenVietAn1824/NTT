@@ -1,4 +1,10 @@
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+// Chuẩn hóa địa chỉ backend: bỏ khoảng trắng / dấu "/" cuối, thêm https:// nếu thiếu
+const normalizeUrl = (v, fallback) => {
+  const s = (v || '').trim().replace(/\/+$/, '');
+  if (!s) return fallback;
+  return /^https?:\/\//.test(s) ? s : `https://${s}`;
+};
+const BACKEND_URL = normalizeUrl(process.env.BACKEND_URL, 'http://localhost:4000');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
